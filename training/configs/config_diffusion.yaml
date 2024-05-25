@@ -1,0 +1,21 @@
+# Configuration for training diffusion transformer
+
+model:
+  embedding_dim: 512
+  nhead: 8
+  num_encoder_layers: 6
+  dropout: 0.1
+
+training:
+  learning_rate: 1e-4
+  batch_size: 16
+  num_epochs: 50
+  save_interval: 10
+
+data:
+  audio_dir: "path/to/preprocessed/audio_data"
+  image_dir: "path/to/preprocessed/image_data"
+
+output:
+  model_save_path: "path/to/save/models"
+  log_dir: "path/to/save/logs"

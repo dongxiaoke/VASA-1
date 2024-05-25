@@ -1,0 +1,41 @@
+# Basic dependencies
+numpy
+scipy
+pandas
+matplotlib
+
+# Deep learning framework
+torch
+torchvision
+torchaudio
+tensorflow
+
+# Transformer and diffusion models
+transformers
+diffusers
+
+# Audio processing
+librosa
+pydub
+
+# Image processing
+opencv-python
+Pillow
+
+# Pretrained models
+timm
+transformers
+
+# Data handling
+h5py
+
+# Evaluation
+scikit-learn
+scipy
+
+# Utilities
+tqdm
+einops
+
+# Jupyter notebooks
+jupyter

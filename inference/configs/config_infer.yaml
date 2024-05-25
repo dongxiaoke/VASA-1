@@ -1,0 +1,16 @@
+# Configuration for inference
+
+model:
+  face_encoder_path: "path/to/saved/face_encoder.pth"
+  face_decoder_path: "path/to/saved/face_decoder.pth"
+  diffusion_transformer_path: "path/to/saved/diffusion_transformer.pth"
+  wav2vec2_model_name: "facebook/wav2vec2-base-960h"
+
+data:
+  input_image_path: "path/to/input/image.png"
+  input_audio_path: "path/to/input/audio.wav"
+  output_video_path: "path/to/output/video.mp4"
+
+video:
+  frame_rate: 25
+  resolution: [512, 512]
