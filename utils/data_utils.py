@@ -27,15 +27,9 @@ class PreprocessedVideoDataset(Dataset):
         return len(self.video_files)
 
     def __getitem__(self, idx):
-        video_frames = []
         frame_files = sorted(os.listdir(self.video_files[idx]), key=lambda x: int(x.split('_')[1].split('.')[0]))
-        for frame_file in frame_files:
-            frame = torch.load(os.path.join(self.video_files[idx], frame_file))
-            if self.transform:
-                frame = self.transform(frame)
-            video_frames.append(frame)
-        video_tensor = torch.stack(video_frames)
-        return video_tensor
+        frames = [os.path.join(self.video_files[idx], frame_file) for frame_file in frame_files]
+        return frames
 
 def pad_collate(batch):
     max_len = max([item.size(0) for item in batch])
@@ -61,3 +55,12 @@ def load_tensor(file_path):
     tensor = torch.load(file_path)
     print(f"Tensor loaded from {file_path}")
     return tensor
+
+def load_frame(frame_path, transform=None):
+    frame = torch.load(frame_path)
+    if transform:
+        frame = transform(frame)
+    return frame
+
+def frame_collate(batch):
+    return batch
