@@ -1,4 +1,8 @@
+import sys
 import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,25 +10,36 @@ from torch.utils.data import DataLoader
 from transformers import Wav2Vec2Model
 from models.transformers.diffusion_transformer import DiffusionTransformer
 from utils.model_utils import save_model, load_model
-from utils.data_utils import PreprocessedDataset
+from utils.data_utils import PreprocessedDataset, PreprocessedVideoDataset
 import yaml
+
+# Add the root directory of the project to the PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Custom Dataset for loading preprocessed data
-class AudioImageDataset(PreprocessedDataset):
-    def __init__(self, audio_dir, image_dir, transform=None):
-        super().__init__(audio_dir, transform)
-        self.image_dir = image_dir
-        self.image_files = [os.path.join(image_dir, file) for file in os.listdir(image_dir)]
+class AudioVideoDataset(Dataset):
+    def __init__(self, audio_dir, video_dir, transform=None):
+        self.audio_files = [os.path.join(audio_dir, file) for file in os.listdir(audio_dir)]
+        self.video_dirs = [os.path.join(video_dir, dir) for dir in os.listdir(video_dir)]
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.audio_files)
 
     def __getitem__(self, idx):
-        audio = super().__getitem__(idx)
-        image = torch.load(self.image_files[idx])
-        if self.transform:
-            image = self.transform(image)
-        return audio, image
+        audio = torch.load(self.audio_files[idx])
+        video_frames = []
+        frame_files = sorted(os.listdir(self.video_dirs[idx]), key=lambda x: int(x.split('_')[1].split('.')[0]))
+        for frame_file in frame_files:
+            frame = torch.load(os.path.join(self.video_dirs[idx], frame_file))
+            if self.transform:
+                frame = self.transform(frame)
+            video_frames.append(frame)
+        video = torch.stack(video_frames)
+        return audio, video
 
 # Loss function
 class DiffusionLoss(nn.Module):
@@ -35,9 +50,9 @@ class DiffusionLoss(nn.Module):
     def forward(self, input, target):
         return self.mse_loss(input, target)
 
-def train_diffusion(audio_dir, image_dir, model_save_path, embedding_dim, nhead, num_encoder_layers, dropout, learning_rate, batch_size, num_epochs, save_interval):
+def train_diffusion(audio_dir, video_dir, model_save_path, embedding_dim, nhead, num_encoder_layers, dropout, learning_rate, batch_size, num_epochs, save_interval):
     # Load preprocessed data
-    dataset = AudioImageDataset(audio_dir, image_dir)
+    dataset = AudioVideoDataset(audio_dir, video_dir)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Initialize models
@@ -55,9 +70,9 @@ def train_diffusion(audio_dir, image_dir, model_save_path, embedding_dim, nhead,
         diffusion_transformer.train()
         total_loss = 0.0
 
-        for audio, image in dataloader:
+        for audio, video in dataloader:
             audio = audio.to(device)
-            image = image.to(device)
+            video = video.to(device)
 
             # Extract audio features using Wav2Vec2
             with torch.no_grad():
@@ -71,7 +86,7 @@ def train_diffusion(audio_dir, image_dir, model_save_path, embedding_dim, nhead,
             motion_latent_codes = diffusion_transformer(audio_features, gaze_direction, head_distance, emotion_offset)
 
             # Compute loss
-            loss = criterion(motion_latent_codes, image)
+            loss = criterion(motion_latent_codes, video)
 
             # Backward pass and optimization
             optimizer.zero_grad()
@@ -107,7 +122,7 @@ if __name__ == "__main__":
     num_epochs = config['training']['num_epochs']
     save_interval = config['training']['save_interval']
     audio_dir = config['data']['audio_dir']
-    image_dir = config['data']['image_dir']
+    video_dir = config['data']['video_dir']
     model_save_path = config['output']['model_save_path']
 
-    train_diffusion(audio_dir, image_dir, model_save_path, embedding_dim, nhead, num_encoder_layers, dropout, learning_rate, batch_size, num_epochs, save_interval)
+    train_diffusion(audio_dir, video_dir, model_save_path, embedding_dim, nhead, num_encoder_layers, dropout, learning_rate, batch_size, num_epochs, save_interval)

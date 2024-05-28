@@ -13,9 +13,9 @@ training:
   save_interval: 10
 
 data:
-  audio_dir: "path/to/preprocessed/audio_data"
-  image_dir: "path/to/preprocessed/image_data"
+  audio_dir: "data/processed/audio"  # Path to preprocessed audio data
+  video_dir: "data/processed/video"  # Path to preprocessed video frames
 
 output:
-  model_save_path: "path/to/save/models"
-  log_dir: "path/to/save/logs"
+  model_save_path: "output/models/diffusion"  # Path to save models
+  log_dir: "output/logs/diffusion"  # Path to save logs

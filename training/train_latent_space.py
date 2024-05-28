@@ -1,4 +1,8 @@
+import sys
 import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,11 +11,15 @@ from torchvision.utils import save_image
 from models.encoders.face_encoder import FaceEncoder
 from models.decoders.face_decoder import FaceDecoder
 from utils.model_utils import save_model, load_model
-from utils.data_utils import PreprocessedDataset
+from utils.data_utils import PreprocessedVideoDataset, pad_collate  # Assuming this is implemented to handle video frames
 import yaml
+
+# Add the root directory of the project to the PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
 
 # Loss function
 class ReconstructionLoss(nn.Module):
@@ -22,14 +30,18 @@ class ReconstructionLoss(nn.Module):
     def forward(self, input, target):
         return self.mse_loss(input, target)
 
-def train_latent_space(image_dir, model_save_path, embedding_dim, learning_rate, batch_size, num_epochs, save_interval):
+def train_latent_space(video_dir, model_save_path, embedding_dim, learning_rate, batch_size, num_epochs, save_interval):
+    print("Loading dataset...")
     # Load preprocessed data
-    dataset = PreprocessedDataset(image_dir)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataset = PreprocessedVideoDataset(video_dir)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate)
+    print("Dataset loaded successfully.")
 
     # Initialize models
+    print("Initializing models...")
     face_encoder = FaceEncoder(embedding_dim).to(device)
     face_decoder = FaceDecoder(embedding_dim).to(device)
+    print("Models initialized.")
 
     # Optimizers
     optimizer = optim.Adam(list(face_encoder.parameters()) + list(face_decoder.parameters()), lr=learning_rate)
@@ -38,12 +50,14 @@ def train_latent_space(image_dir, model_save_path, embedding_dim, learning_rate,
     criterion = ReconstructionLoss()
 
     # Training loop
+    print("Starting training...")
     for epoch in range(num_epochs):
         face_encoder.train()
         face_decoder.train()
         total_loss = 0.0
 
-        for batch in dataloader:
+        for batch_idx, batch in enumerate(dataloader):
+            print(f"Processing batch {batch_idx+1}/{len(dataloader)}")
             batch = batch.to(device)
 
             # Forward pass
@@ -81,11 +95,12 @@ if __name__ == "__main__":
 
     # Extract configuration parameters
     embedding_dim = config['model']['embedding_dim']
-    learning_rate = config['training']['learning_rate']
+    learning_rate = float(config['training']['learning_rate'])  # Convert learning rate to float
     batch_size = config['training']['batch_size']
     num_epochs = config['training']['num_epochs']
     save_interval = config['training']['save_interval']
-    image_dir = config['data']['image_dir']
+    video_dir = config['data']['video_dir']
     model_save_path = config['output']['model_save_path']
 
-    train_latent_space(image_dir, model_save_path, embedding_dim, learning_rate, batch_size, num_epochs, save_interval)
+    # Start training
+    train_latent_space(video_dir, model_save_path, embedding_dim, learning_rate, batch_size, num_epochs, save_interval)

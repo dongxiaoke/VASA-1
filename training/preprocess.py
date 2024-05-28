@@ -1,10 +1,10 @@
 import os
-import numpy as np
+import cv2
 import torch
 import torchaudio
-import cv2
 from torchvision import transforms
 from torchaudio.transforms import Resample
+from PIL import Image
 
 # Constants
 SAMPLE_RATE = 16000
@@ -22,17 +22,20 @@ def load_data(data_dir):
     """
     Load datasets from the specified directory.
     """
+    video_files = []
     audio_files = []
-    image_files = []
     
     for root, _, files in os.walk(data_dir):
         for file in files:
-            if file.endswith('.wav'):
+            if file.endswith('.mp4'):
+                video_files.append(os.path.join(root, file))
+            elif file.endswith('.wav'):
                 audio_files.append(os.path.join(root, file))
-            elif file.endswith(('.jpg', '.png')):
-                image_files.append(os.path.join(root, file))
     
-    return audio_files, image_files
+    print(f'Found {len(video_files)} video files: {video_files}')
+    print(f'Found {len(audio_files)} audio files: {audio_files}')
+    
+    return video_files, audio_files
 
 def preprocess_audio(audio_file):
     """
@@ -50,26 +53,33 @@ def preprocess_audio(audio_file):
     
     return waveform
 
-def preprocess_image(image_file):
+def extract_frames(video_file):
     """
-    Preprocess image file: load, resize, and normalize.
+    Extract frames from video file.
     """
-    image = cv2.imread(image_file)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = image_transforms(image)
+    cap = cv2.VideoCapture(video_file)
+    frames = []
+    success, frame = cap.read()
+    while success:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = Image.fromarray(frame)  # Convert to PIL image
+        frame = image_transforms(frame)
+        frames.append(frame)
+        success, frame = cap.read()
+    cap.release()
     
-    return image
+    return frames
 
-def preprocess_data(audio_files, image_files):
+def preprocess_data(video_files, audio_files):
     """
-    Preprocess both audio and image files.
+    Preprocess both video and audio files.
     """
     audio_data = [preprocess_audio(audio_file) for audio_file in audio_files]
-    image_data = [preprocess_image(image_file) for image_file in image_files]
+    video_data = [extract_frames(video_file) for video_file in video_files]
     
-    return audio_data, image_data
+    return audio_data, video_data
 
-def save_preprocessed_data(audio_data, image_data, output_dir):
+def save_preprocessed_data(audio_data, video_data, output_dir):
     """
     Save preprocessed data to the specified directory.
     """
@@ -81,11 +91,14 @@ def save_preprocessed_data(audio_data, image_data, output_dir):
     for i, audio in enumerate(audio_data):
         torch.save(audio, os.path.join(audio_output_dir, f'audio_{i}.pt'))
     
-    # Save image data
-    image_output_dir = os.path.join(output_dir, 'image')
-    os.makedirs(image_output_dir, exist_ok=True)
-    for i, image in enumerate(image_data):
-        torch.save(image, os.path.join(image_output_dir, f'image_{i}.pt'))
+    # Save video data
+    video_output_dir = os.path.join(output_dir, 'video')
+    os.makedirs(video_output_dir, exist_ok=True)
+    for i, frames in enumerate(video_data):
+        video_dir = os.path.join(video_output_dir, f'video_{i}')
+        os.makedirs(video_dir, exist_ok=True)
+        for j, frame in enumerate(frames):
+            torch.save(frame, os.path.join(video_dir, f'frame_{j}.pt'))
 
 # Testing the preprocessing
 if __name__ == "__main__":
@@ -93,8 +106,8 @@ if __name__ == "__main__":
     data_dir = "data/raw"
     output_dir = "data/processed"
     
-    audio_files, image_files = load_data(data_dir)
-    audio_data, image_data = preprocess_data(audio_files, image_files)
-    save_preprocessed_data(audio_data, image_data, output_dir)
+    video_files, audio_files = load_data(data_dir)
+    audio_data, video_data = preprocess_data(video_files, audio_files)
+    save_preprocessed_data(audio_data, video_data, output_dir)
     
-    print(f"Preprocessed {len(audio_data)} audio files and {len(image_data)} image files.")
+    print(f"Preprocessed {len(audio_data)} audio files and {len(video_data)} video files.")
